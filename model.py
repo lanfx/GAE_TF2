@@ -8,7 +8,6 @@ class GCNModelVAE(tf.keras.Model):
     def __init__(self, adj, MODEL_INFO, name=None, **kwargs):
         super(GCNModelVAE, self).__init__(name=name)
 
-        # 构建噪声用于reconstruction
         self.node_num = MODEL_INFO.node_num
         self.output_dim = MODEL_INFO.hidden2_output_dim
 
@@ -20,7 +19,7 @@ class GCNModelVAE(tf.keras.Model):
             activation=tf.nn.relu
         )
 
-        # self.z_mean 用于习得模型的均值
+        # encoder1:self.z_mean 用于习得模型的均值
         self.encoder_z_mean = GraphConvolution(
             output_dim=MODEL_INFO.hidden2_output_dim,
             adj=adj,
@@ -28,7 +27,8 @@ class GCNModelVAE(tf.keras.Model):
             activation=lambda x: x
         )
 
-        # self.z_log_std用于习得模型的标准差,但是是log形式，即log 标准差=GCN(X,A),因此标准差=e^(GCN(X,A))
+        # encoder2:self.z_log_std用于习得模型的标准差:log 标准差=GCN(X,A),标准差=e^(GCN(X,A))
+        # encoder1,encoder2共享参数
         self.encoder_z_log_std = GraphConvolution(
             output_dim=MODEL_INFO.hidden2_output_dim,
             adj=adj,
@@ -48,17 +48,15 @@ class GCNModelVAE(tf.keras.Model):
         # Encoder
         self.z_mean = self.encoder_z_mean(self.embedding)
         self.z_log_std = self.encoder_z_log_std(self.embedding)
-        embedding_distribution = self.z_mean + tf.random.normal([self.node_num, self.output_dim]) * tf.exp(self.z_log_std)
+
+        self.z = self.z_mean + tf.random.normal([self.node_num, self.output_dim]) * tf.exp(self.z_log_std)
 
         # Decoder
-        self.reconstructions = self.decoder(embedding_distribution)
-        # return (reconstructions,embedding,z_mean,z_log_std,embedding_distribution)
+        self.reconstructions = self.decoder(self.z)
         return self.reconstructions
 
-
-
-# test
-# if __name__=='__main__':
+if __name__=='__main__':
+    pass
 # ModelInfo=collections.namedtuple('ModelInfo',['dropout','node_num','hidden1_output_dim','hidden2_output_dim'])
 # MODEL_INFO=ModelInfo(dropout=0.1,node_num=4,hidden1_output_dim=4,hidden2_output_dim=2)
 # print(MODEL_INFO.dropout)
